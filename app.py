@@ -2,18 +2,15 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
 import numpy as np
 
-# ====== KONFIGURASI PAGE ======
 st.set_page_config(
-    page_title="Dashboard Sepak Bola Dunia",
+    page_title="Statistik Sepak Bola Dunia",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ====== CUSTOM CSS UNTUK UI YANG LEBIH CANTIK ======
 st.markdown("""
 <style>
     .main-header {
@@ -30,32 +27,16 @@ st.markdown("""
         border-bottom: 2px solid #f0f0f0;
         padding-bottom: 0.5rem;
     }
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #1f77b4;
-        margin-bottom: 1rem;
-    }
-    .stSelectbox > div > div {
-        border: 2px solid #1f77b4;
-        border-radius: 10px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# ====== FUNGSI DATA CLEANING ======
 @st.cache_data(ttl=3600)
 def load_and_clean_data():
-    """Load dan cleaning semua data sekaligus"""
-    
-    # Load data
     results = pd.read_csv("results.csv")
     goals = pd.read_csv("goalscorers.csv")
     shootouts = pd.read_csv("shootouts.csv")
     former = pd.read_csv("former_names.csv")
     
-    # ====== CLEANING RESULTS DATA ======
     results_clean = results.copy()
     results_clean["date"] = pd.to_datetime(results_clean["date"], errors='coerce')
     results_clean = results_clean.dropna(subset=["date"])
@@ -67,7 +48,6 @@ def load_and_clean_data():
     results_clean["away_score"] = pd.to_numeric(results_clean["away_score"], errors='coerce').fillna(0).astype(int)
     results_clean = results_clean[(results_clean["year"] >= 1872) & (results_clean["year"] <= 2025)]
     
-    # ====== CLEANING GOALS DATA ======
     goals_clean = goals.copy()
     goals_clean["home_team"] = goals_clean["home_team"].str.strip().str.title()
     goals_clean["away_team"] = goals_clean["away_team"].str.strip().str.title()
@@ -81,13 +61,11 @@ def load_and_clean_data():
         goals_clean[col] = goals_clean[col].fillna(False)
         goals_clean[col] = goals_clean[col].astype(bool)
     
-    # ====== CLEANING SHOOTOUTS DATA ======
     shootouts_clean = shootouts.copy()
     shootouts_clean["home_team"] = shootouts_clean["home_team"].str.strip().str.title()
     shootouts_clean["away_team"] = shootouts_clean["away_team"].str.strip().str.title()
     shootouts_clean["winner"] = shootouts_clean["winner"].str.strip().str.title()
     
-    # ====== CLEANING FORMER NAMES DATA ======
     former_clean = former.copy()
     former_clean["current"] = former_clean["current"].str.strip().str.title()
     former_clean["former"] = former_clean["former"].str.strip().str.title()
@@ -99,7 +77,6 @@ def load_and_clean_data():
 
 @st.cache_data(ttl=600)
 def get_country_list(results):
-    """Dapatkan list negara yang unik dengan quality check"""
     home_teams = set(results["home_team"].dropna())
     away_teams = set(results["away_team"].dropna())
     countries = sorted(list(home_teams.union(away_teams)))
@@ -108,8 +85,6 @@ def get_country_list(results):
 
 @st.cache_data(ttl=300)
 def filter_country_data(results, goals, shootouts, former, country):
-    """Filter data untuk negara tertentu dengan validasi tambahan"""
-    
     country_mask = (results["home_team"] == country) | (results["away_team"] == country)
     data_negara = results[country_mask].copy()
     
@@ -144,12 +119,9 @@ def filter_country_data(results, goals, shootouts, former, country):
 
 @st.cache_data(ttl=300)
 def calculate_additional_stats(data_negara, goal_negara, country):
-    """Hitung statistik tambahan dengan validasi data"""
-    
     if data_negara.empty:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     
-    # 1. Head-to-Head vs Lawan
     head_to_head = []
     for opponent in set(data_negara["home_team"]).union(set(data_negara["away_team"])):
         if opponent != country and pd.notna(opponent):
@@ -170,21 +142,19 @@ def calculate_additional_stats(data_negara, goal_negara, country):
                         "Seri": draws,
                         "Kalah": losses,
                         "Total": total,
-                        "Win Rate": (wins / total * 100) if total > 0 else 0
+                        "Persentase Kemenangan": (wins / total * 100) if total > 0 else 0
                     })
     
     head_to_head_df = pd.DataFrame(head_to_head)
     
-    # 2. Performa Berdasarkan Turnamen
     tournament_stats = data_negara.groupby("tournament").agg({
         "hasil": lambda x: (x == "Menang").sum(),
         "date": "count"
     }).rename(columns={"hasil": "Menang", "date": "Total"}).reset_index()
     
     tournament_stats = tournament_stats[tournament_stats["Total"] > 0]
-    tournament_stats["Win Rate"] = (tournament_stats["Menang"] / tournament_stats["Total"] * 100).round(1)
+    tournament_stats["Persentase Kemenangan"] = (tournament_stats["Menang"] / tournament_stats["Total"] * 100).round(1)
     
-    # 3. Timeline Gol dengan validasi
     goal_timeline = goal_negara[goal_negara["team"] == country].copy()
     if not goal_timeline.empty:
         goal_timeline["date"] = pd.to_datetime(goal_timeline["date"], errors='coerce')
@@ -198,12 +168,9 @@ def calculate_additional_stats(data_negara, goal_negara, country):
 
 @st.cache_data(ttl=300)
 def calculate_advanced_stats(data_negara, goal_negara, country):
-    """Hitung statistik advanced untuk visualisasi interaktif"""
-    
     if data_negara.empty:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     
-    # 1. Performance Timeline (10-year intervals)
     data_negara["decade"] = (data_negara["year"] // 10) * 10
     decade_stats = data_negara.groupby("decade").agg({
         "hasil": lambda x: (x == "Menang").sum(),
@@ -215,7 +182,6 @@ def calculate_advanced_stats(data_negara, goal_negara, country):
     decade_stats["Win_Rate"] = (decade_stats["Menang"] / decade_stats["Total"] * 100).round(1)
     decade_stats["Goals_Per_Match"] = ((decade_stats["Home_Goals"] + decade_stats["Away_Goals"]) / decade_stats["Total"]).round(2)
     
-    # 2. Home vs Away Performance
     home_games = data_negara[data_negara["home_team"] == country]
     away_games = data_negara[data_negara["away_team"] == country]
     
@@ -232,7 +198,6 @@ def calculate_advanced_stats(data_negara, goal_negara, country):
         ]
     })
     
-    # 3. Goal Analysis by Type
     goal_analysis = goal_negara[goal_negara["team"] == country]
     if not goal_analysis.empty:
         goal_types = {
@@ -246,37 +211,32 @@ def calculate_advanced_stats(data_negara, goal_negara, country):
     
     return decade_stats, home_away_stats, goal_types_df
 
-# ====== LOAD DATA ======
 with st.spinner("🔄 Loading data..."):
     results, goals, shootouts, former = load_and_clean_data()
 
-# ====== HEADER YANG LEBIH MENARIK ======
-st.markdown('<h1 class="main-header">⚽ Dashboard Sepak Bola Dunia</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">Statistik Sepak Bola Dunia</h1>', unsafe_allow_html=True)
 
 col_header1, col_header2, col_header3 = st.columns([1,2,1])
 with col_header2:
     st.markdown(
-        "Hai! Di dashboard ini, kamu bisa lihat berbagai data menarik soal pertandingan internasional dari tahun 1872–2025. Yuk, eksplor bareng!"
+        "Halo, disini kamu bisa lihat berbagai data menarik soal pertandingan internasional dari tahun 1872–2025!"
     )
 
 st.markdown("---")
 
-# ====== SIDEBAR YANG INTERAKTIF ======
 with st.sidebar:
     st.markdown("### 🌍 Pilih Negara")
     
     negara_list = get_country_list(results)
     pilih_negara = st.selectbox(
-        "Pilih negara yang pengen kamu lihat datanya:", 
+        "Pilih negara yang ingin dilihat datanya:", 
         negara_list, 
         index=negara_list.index("Indonesia") if "Indonesia" in negara_list else 0
     )
     
-    # Filter tambahan untuk visualisasi interaktif
     st.markdown("---")
     st.markdown("### ⚙️ Filter Lanjutan")
     
-    # Filter tahun
     tahun_min = int(results["year"].min())
     tahun_max = int(results["year"].max())
     tahun_range = st.slider(
@@ -285,12 +245,9 @@ with st.sidebar:
         max_value=tahun_max,
         value=(tahun_min, tahun_max)
     )
-    
 
-# ====== FILTER DATA BERDASARKAN INPUT USER ======
 data_negara, goal_negara, shoot_negara, former_negara = filter_country_data(results, goals, shootouts, former, pilih_negara)
 
-# Apply additional filters
 if not data_negara.empty:
     data_negara = data_negara[
         (data_negara["year"] >= tahun_range[0]) & 
@@ -309,49 +266,31 @@ if not shoot_negara.empty:
         (pd.to_datetime(shoot_negara["date"]).dt.year <= tahun_range[1])
     ]
 
-# ====== QUICK STATS CARDS ======
 if not data_negara.empty:
-    st.markdown("### 📈 Quick Overview")
+    st.markdown("### 📈 Ringkasan Singkat")
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         total_matches = len(data_negara)
-        st.metric(
-            label="Total Pertandingan", 
-            value=f"{total_matches:,}",
-            help="Jumlah semua pertandingan yang pernah dimainkan"
-        )
+        st.metric("Total Pertandingan", f"{total_matches:,}")
     
     with col2:
         wins = len(data_negara[data_negara["hasil"] == "Menang"])
         win_rate = (wins / total_matches * 100) if total_matches > 0 else 0
-        st.metric(
-            label="Win Rate", 
-            value=f"{win_rate:.1f}%",
-            help="Persentase kemenangan dari semua pertandingan"
-        )
+        st.metric("Persentase Kemenangan", f"{win_rate:.1f}%")
     
     with col3:
         total_goals = len(goal_negara[goal_negara["team"] == pilih_negara])
-        st.metric(
-            label="Gol Tercatat", 
-            value=f"{total_goals:,}",
-            help="Total gol yang berhasil dicetak"
-        )
+        st.metric("Gol Tercatat", f"{total_goals:,}")
     
     with col4:
         first_year = data_negara["year"].min()
         last_year = data_negara["year"].max()
-        st.metric(
-            label="Rentang Tahun", 
-            value=f"{first_year}-{last_year}",
-            help="Periode pertandingan yang tercatat"
-        )
+        st.metric("Rentang Tahun", f"{first_year}-{last_year}")
 
-# ====== VISUALISASI INTERAKTIF BARU 1: PERFORMANCE BY DECADE ======
 st.markdown("---")
-st.markdown('<div class="section-header">📊 Performance per Dekade</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">📊 Performa per-dekade</div>', unsafe_allow_html=True)
 
 if not data_negara.empty:
     decade_stats, home_away_stats, goal_types_df = calculate_advanced_stats(data_negara, goal_negara, pilih_negara)
@@ -360,67 +299,50 @@ if not data_negara.empty:
         col_decade1, col_decade2 = st.columns(2)
         
         with col_decade1:
-            # Win Rate per Decade
             fig_decade1 = px.line(
                 decade_stats,
                 x="decade",
                 y="Win_Rate",
-                title=f"Win Rate {pilih_negara} per Dekade",
+                title=f"Persentase kemenangan {pilih_negara} per-dekade",
                 markers=True,
                 color_discrete_sequence=['#1f77b4']
             )
-            fig_decade1.update_layout(
-                xaxis_title="Dekade",
-                yaxis_title="Win Rate (%)",
-                hovermode="x unified"
-            )
+            fig_decade1.update_layout(xaxis_title="Dekade", yaxis_title="Persentase Kemenangan (%)", hovermode="x unified")
             st.plotly_chart(fig_decade1, use_container_width=True)
-            st.caption("📈 Lihat perkembangan performa tim dari dekade ke dekade!")
+            st.caption("📈 Lihat perkembangan performa tim tiap dekade!")
         
         with col_decade2:
-            # Goals per Match per Decade
             fig_decade2 = px.bar(
                 decade_stats,
                 x="decade",
                 y="Goals_Per_Match",
-                title=f"Rata-rata Gol per Pertandingan {pilih_negara} per Dekade",
+                title=f"Rata-rata Gol per Pertandingan {pilih_negara} per-dekade",
                 color="Goals_Per_Match",
                 color_continuous_scale="viridis"
             )
-            fig_decade2.update_layout(
-                xaxis_title="Dekade",
-                yaxis_title="Gol per Pertandingan"
-            )
+            fig_decade2.update_layout(xaxis_title="Dekade", yaxis_title="Gol per Pertandingan")
             st.plotly_chart(fig_decade2, use_container_width=True)
             st.caption("⚽ Era mana yang paling produktif dalam mencetak gol?")
-    else:
-        st.info("📊 Tidak ada data yang cukup untuk analisis per dekade.")
 
-# ====== VISUALISASI INTERAKTIF BARU 2: HOME VS AWAY PERFORMANCE ======
-st.markdown('<div class="section-header">🏠🏃 Performance Kandang vs Tandang</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">🏠🏃 Performa Kandang vs Tandang</div>', unsafe_allow_html=True)
 
 if not home_away_stats.empty:
     col_home1, col_home2 = st.columns(2)
     
     with col_home1:
-        # Win Rate Comparison
         fig_home = px.bar(
             home_away_stats,
             x="Tipe",
             y="Win_Rate",
-            title=f"Win Rate {pilih_negara} - Kandang vs Tandang",
+            title=f"Persentase Kemenangan {pilih_negara} - Kandang vs Tandang",
             color="Tipe",
             color_discrete_sequence=['#2ecc71', '#3498db']
         )
-        fig_home.update_layout(
-            yaxis_title="Win Rate (%)",
-            showlegend=False
-        )
+        fig_home.update_layout(yaxis_title="Persentase Kemenangan (%)", showlegend=False)
         st.plotly_chart(fig_home, use_container_width=True)
         st.caption("🔍 Tim lebih kuat main di kandang atau tandang?")
     
     with col_home2:
-        # Total Matches Comparison
         fig_home2 = px.pie(
             home_away_stats,
             values="Total_Pertandingan",
@@ -431,7 +353,6 @@ if not home_away_stats.empty:
         st.plotly_chart(fig_home2, use_container_width=True)
         st.caption("📊 Seberapa sering tim main di kandang vs tandang?")
 
-# ====== VISUALISASI INTERAKTIF BARU 3: GOAL TYPE ANALYSIS ======
 st.markdown('<div class="section-header">🎯 Analisis Tipe Gol</div>', unsafe_allow_html=True)
 
 if not goal_types_df.empty and len(goal_types_df) > 0:
@@ -451,25 +372,18 @@ if not goal_types_df.empty and len(goal_types_df) > 0:
         st.markdown("### 📝 Breakdown Gol")
         for _, row in goal_types_df.iterrows():
             percentage = (row["Jumlah"] / goal_types_df["Jumlah"].sum() * 100) if goal_types_df["Jumlah"].sum() > 0 else 0
-            st.metric(
-                label=row["Tipe_Gol"],
-                value=f"{row['Jumlah']}",
-                delta=f"{percentage:.1f}%"
-            )
+            st.metric(label=row["Tipe_Gol"], value=f"{row['Jumlah']}", delta=f"{percentage:.1f}%")
     
     st.caption("🎪 Lihat komposisi gol - berapa banyak dari penalty, own goal, atau gol normal?")
 
-# ====== VISUALISASI INTERAKTIF BARU 4: INTERACTIVE MATCH TIMELINE ======
 st.markdown('<div class="section-header">🕒 Timeline Interaktif Pertandingan</div>', unsafe_allow_html=True)
 
 if not data_negara.empty:
-    # Siapkan data untuk timeline
     timeline_data = data_negara.nlargest(50, "date")[["date", "home_team", "away_team", "home_score", "away_score", "hasil", "tournament"]].copy()
     timeline_data["date_str"] = timeline_data["date"].dt.strftime("%Y-%m-%d")
     timeline_data["match_result"] = timeline_data.apply(
         lambda x: f"{x['home_team']} {x['home_score']}-{x['away_score']} {x['away_team']}", axis=1
     )
-    timeline_data["color"] = timeline_data["hasil"].map({"Menang": "#2ecc71", "Seri": "#f1c40f", "Kalah": "#e74c3c"})
     
     fig_timeline = px.scatter(
         timeline_data,
@@ -482,18 +396,10 @@ if not data_negara.empty:
         color_discrete_map={"Menang": "#2ecc71", "Seri": "#f1c40f", "Kalah": "#e74c3c"}
     )
     
-    fig_timeline.update_layout(
-        xaxis_title="Tanggal",
-        yaxis_title="Turnamen",
-        height=400
-    )
-    
+    fig_timeline.update_layout(xaxis_title="Tanggal", yaxis_title="Turnamen", height=400)
     st.plotly_chart(fig_timeline, use_container_width=True)
     st.caption("🕓 Timeline interaktif pertandingan terakhir. Hover untuk detail setiap pertandingan!")
 
-# ====== VISUALISASI LAMA YANG TETAP DIKEEP ======
-
-# ====== VISUALISASI 1: TREN PERTANDINGAN ======
 st.markdown('<div class="section-header">📅 Tren Pertandingan per Tahun</div>', unsafe_allow_html=True)
 
 if not data_negara.empty:
@@ -508,19 +414,10 @@ if not data_negara.empty:
             markers=True,
             color_discrete_sequence=['#1f77b4']
         )
-        fig1.update_layout(
-            hovermode="x unified",
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-        )
+        fig1.update_layout(hovermode="x unified")
         st.plotly_chart(fig1, use_container_width=True)
-        st.caption(
-            f"📊 Terlihat kalau {pilih_negara} punya tren pertandingan yang {'naik turun tergantung turnamen besar' if len(tren_tahun)>0 else 'belum banyak datanya nih!'}."
-        )
-    else:
-        st.info("📈 Tidak ada data tren yang bisa ditampilkan untuk negara ini.")
+        st.caption(f"📊 Terlihat kalau {pilih_negara} punya tren pertandingan yang {'naik turun tergantung turnamen besar' if len(tren_tahun)>0 else 'belum banyak datanya nih!'}.")
 
-# ====== VISUALISASI 2: REKOR MENANG, SERI, KALAH ======
 st.markdown('<div class="section-header">🏆 Rekor Menang, Seri, Kalah</div>', unsafe_allow_html=True)
 
 if not data_negara.empty:
@@ -536,14 +433,9 @@ if not data_negara.empty:
             color_discrete_sequence=["#2ecc71", "#f1c40f", "#e74c3c"],
             title=f"Rekor Hasil Pertandingan {pilih_negara}",
         )
-        fig2.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-        )
         st.plotly_chart(fig2, use_container_width=True)
         st.caption(f"⚔️ {pilih_negara} punya total {len(data_negara)} pertandingan yang tercatat di dataset ini!")
 
-# ====== VISUALISASI 3: PENCETAK GOL TERBANYAK ======
 st.markdown('<div class="section-header">⚡ Pencetak Gol Terbanyak</div>', unsafe_allow_html=True)
 
 pencetak_gol = goal_negara[goal_negara["team"] == pilih_negara]
@@ -563,18 +455,9 @@ if not pencetak_gol.empty:
             color="Jumlah Gol",
             color_continuous_scale="blues",
         )
-        fig3.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-        )
         st.plotly_chart(fig3, use_container_width=True)
         st.caption("🔥 Ini dia deretan pemain yang paling sering nyetak gol buat negaranya!")
-    else:
-        st.info("🥅 Tidak ada data pencetak gol yang valid untuk negara ini.")
-else:
-    st.info("🥅 Tidak ada data pencetak gol untuk negara ini.")
 
-# ====== VISUALISASI 4: HEAD-TO-HEAD VS LAWAN ======
 st.markdown('<div class="section-header">🤼 Head-to-Head vs Lawan Teratas</div>', unsafe_allow_html=True)
 
 head_to_head_df, tournament_stats, goals_by_year = calculate_additional_stats(data_negara, goal_negara, pilih_negara)
@@ -583,46 +466,15 @@ if not head_to_head_df.empty:
     top_opponents = head_to_head_df.nlargest(10, "Total")
     
     fig4 = go.Figure()
+    fig4.add_trace(go.Bar(name='Menang', y=top_opponents['Lawan'], x=top_opponents['Menang'], orientation='h', marker_color='#2ecc71'))
+    fig4.add_trace(go.Bar(name='Seri', y=top_opponents['Lawan'], x=top_opponents['Seri'], orientation='h', marker_color='#f1c40f'))
+    fig4.add_trace(go.Bar(name='Kalah', y=top_opponents['Lawan'], x=top_opponents['Kalah'], orientation='h', marker_color='#e74c3c'))
     
-    fig4.add_trace(go.Bar(
-        name='Menang',
-        y=top_opponents['Lawan'],
-        x=top_opponents['Menang'],
-        orientation='h',
-        marker_color='#2ecc71'
-    ))
-    
-    fig4.add_trace(go.Bar(
-        name='Seri',
-        y=top_opponents['Lawan'],
-        x=top_opponents['Seri'],
-        orientation='h',
-        marker_color='#f1c40f'
-    ))
-    
-    fig4.add_trace(go.Bar(
-        name='Kalah',
-        y=top_opponents['Lawan'],
-        x=top_opponents['Kalah'],
-        orientation='h',
-        marker_color='#e74c3c'
-    ))
-    
-    fig4.update_layout(
-        title=f"Head-to-Head {pilih_negara} vs Lawan Terbanyak",
-        barmode='stack',
-        height=500,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-    )
-    
+    fig4.update_layout(title=f"Head-to-Head {pilih_negara} vs Lawan Terbanyak", barmode='stack', height=500)
     st.plotly_chart(fig4, use_container_width=True)
     st.caption("💪 Lihat nih, rival-rival terberat dan yang paling sering ditaklukkan!")
-else:
-    st.info("📊 Belum ada data head-to-head yang cukup untuk ditampilkan.")
 
-# ====== VISUALISASI 5: PERFORMANCE DI BERBAGAI TURNAMEN ======
-st.markdown('<div class="section-header">🏅 Performance di Berbagai Turnamen</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">🏅 Performa di Berbagai Turnamen</div>', unsafe_allow_html=True)
 
 if not tournament_stats.empty:
     significant_tournaments = tournament_stats[tournament_stats["Total"] >= 5].nlargest(10, "Total")
@@ -631,28 +483,18 @@ if not tournament_stats.empty:
         fig5 = px.scatter(
             significant_tournaments,
             x="Total",
-            y="Win Rate",
+            y="Persentase Kemenangan",
             size="Menang",
-            color="Win Rate",
+            color="Persentase Kemenangan",
             hover_name="tournament",
             size_max=60,
-            title=f"Performance {pilih_negara} di Berbagai Turnamen",
+            title=f"Performa {pilih_negara} di Berbagai Turnamen",
             color_continuous_scale="viridis"
         )
-        
-        fig5.update_layout(
-            xaxis_title="Total Pertandingan",
-            yaxis_title="Win Rate (%)",
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-        )
-        
+        fig5.update_layout(xaxis_title="Total Pertandingan", yaxis_title="Persentase Kemenangan (%)")
         st.plotly_chart(fig5, use_container_width=True)
-        st.caption("🎯 Turnamen di kanan atas adalah yang paling sering dimainkan DAN punya win rate tinggi!")
-    else:
-        st.info("🏆 Tidak ada turnamen dengan cukup data untuk dianalisis.")
+        st.caption("🎯 Turnamen yang paling atas adalah yang paling sering dimainkan DAN punya persentase kemenangan tertinggi!")
 
-# ====== VISUALISASI 6: TIMELINE GOL DARI MASA KE MASA ======
 st.markdown('<div class="section-header">📈 Timeline Gol dari Masa ke Masa</div>', unsafe_allow_html=True)
 
 if not goals_by_year.empty and len(goals_by_year) > 1:
@@ -663,18 +505,9 @@ if not goals_by_year.empty and len(goals_by_year) > 1:
         title=f"Perkembangan Jumlah Gol {pilih_negara} per Tahun",
         color_discrete_sequence=["#ff6b6b"]
     )
-    
-    fig6.update_layout(
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-    )
-    
     st.plotly_chart(fig6, use_container_width=True)
     st.caption("🚀 Grafik ini menunjukkan era-era produktif dimana tim sering mencetak gol!")
-else:
-    st.info("🥅 Data gol per tahun belum cukup untuk membuat timeline yang meaningful.")
 
-# ====== VISUALISASI 7: ADU PENALTI ======
 st.markdown('<div class="section-header">🥅 Catatan Adu Penalti</div>', unsafe_allow_html=True)
 
 shoot_display = shoot_negara[
@@ -682,60 +515,27 @@ shoot_display = shoot_negara[
 ][["date", "home_team", "away_team", "winner"]].copy()
 
 if not shoot_display.empty:
-    shoot_display.rename(
-        columns={
-            "date": "Tanggal",
-            "home_team": "Tim Tuan Rumah",
-            "away_team": "Tim Tamu",
-            "winner": "Pemenang",
-        },
-        inplace=True,
-    )
+    shoot_display.rename(columns={"date": "Tanggal", "home_team": "Tim Tuan Rumah", "away_team": "Tim Tamu", "winner": "Pemenang"}, inplace=True)
     st.dataframe(shoot_display, hide_index=True, use_container_width=True)
     st.caption(f"🎯 {pilih_negara} terlibat di {len(shoot_display)} pertandingan yang berakhir lewat adu penalti.")
 else:
     st.info("⚪ Belum ada catatan adu penalti untuk negara ini.")
 
-# ====== VISUALISASI 8: NEGARA YANG PERNAH GANTI NAMA ======
-st.markdown('<div class="section-header">🌍 Negara yang Pernah Ganti Nama</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">🌍 Apakah Negara Ini Pernah Berganti Nama?</div>', unsafe_allow_html=True)
 
 former_filtered = former[
-    (former["current"].str.lower() == pilih_negara.lower())
-    | (former["former"].str.lower() == pilih_negara.lower())
+    (former["current"].str.lower() == pilih_negara.lower()) | (former["former"].str.lower() == pilih_negara.lower())
 ]
 
 if not former_filtered.empty:
-    former_filtered.rename(
-        columns={
-            "current": "Nama Sekarang",
-            "former": "Nama Lama",
-            "start_date": "Mulai Digunakan",
-            "end_date": "Selesai Digunakan",
-        },
-        inplace=True,
-    )
-
+    former_filtered.rename(columns={"current": "Nama Sekarang", "former": "Nama Lama", "start_date": "Mulai Digunakan", "end_date": "Selesai Digunakan"}, inplace=True)
     st.dataframe(former_filtered, hide_index=True, use_container_width=True)
-    st.caption(
-        f"🧭 Menarik! {pilih_negara} pernah mengalami perubahan nama resmi di masa tertentu. "
-        "Data di atas menunjukkan periode penggunaan nama lamanya."
-    )
+    st.caption(f"🧭 Menarik! {pilih_negara} pernah mengalami perubahan nama resmi.")
 else:
     st.info(f"✨ {pilih_negara} belum pernah tercatat mengalami perubahan nama resmi.")
 
-# ====== PENUTUP ======
-st.markdown("---")
-st.markdown(
-    f"✨ Dashboard ini dibuat buat eksplorasi seru data sepak bola dunia. Data diambil dari dataset *International Football Results (1872–2025)* di Kaggle. Selamat eksplorasi, semoga dapet insight baru!"
-)
 
-# ====== FOOTER ======
 st.markdown("---")
 col_footer1, col_footer2, col_footer3 = st.columns([1,2,1])
 with col_footer2:
-    st.markdown(
-        "<div style='text-align: center; color: #666; font-size: 0.9rem;'>"
-        "Made with ❤️ using Streamlit | Data Source: Kaggle International Football Results"
-        "</div>", 
-        unsafe_allow_html=True
-    )
+    st.markdown("<div style='text-align: center; color: #666; font-size: 0.9rem;'>Made with ❤️ using Streamlit | Data Source: Kaggle International Football Results</div>", unsafe_allow_html=True)
