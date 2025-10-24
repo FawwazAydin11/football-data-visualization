@@ -27,6 +27,16 @@ st.markdown("""
         border-bottom: 2px solid #f0f0f0;
         padding-bottom: 0.5rem;
     }
+    .insight-box {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #1f77b4;
+        margin: 1rem 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: #333333;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -309,7 +319,18 @@ if not data_negara.empty:
             )
             fig_decade1.update_layout(xaxis_title="Dekade", yaxis_title="Persentase Kemenangan (%)", hovermode="x unified")
             st.plotly_chart(fig_decade1, use_container_width=True)
-            st.caption("📈 Lihat perkembangan performa tim tiap dekade!")
+            
+            best_decade = decade_stats.loc[decade_stats['Win_Rate'].idxmax()]
+            worst_decade = decade_stats.loc[decade_stats['Win_Rate'].idxmin()]
+            with st.expander("📈 **Cerita dari grafik ini**"):
+                st.markdown(f"""
+                <div class="insight-box">
+                Dari data yang ada, {pilih_negara} mengalami masa keemasan di dekade {int(best_decade['decade'])}-an dengan persentase kemenangan mencapai {best_decade['Win_Rate']}%. 
+                Sementara itu, dekade {int(worst_decade['decade'])}-an menjadi periode yang cukup menantang dengan win rate hanya {worst_decade['Win_Rate']}%. 
+                Yang menarik, performa di dekade terkini ({int(decade_stats.iloc[-1]['decade'])}-an) menunjukkan angka {decade_stats.iloc[-1]['Win_Rate']}%, 
+                {'lebih baik' if decade_stats.iloc[-1]['Win_Rate'] > decade_stats.iloc[0]['Win_Rate'] else 'lebih rendah'} dibanding dekade {int(decade_stats.iloc[0]['decade'])}-an.
+                </div>
+                """, unsafe_allow_html=True)
         
         with col_decade2:
             fig_decade2 = px.bar(
@@ -322,7 +343,16 @@ if not data_negara.empty:
             )
             fig_decade2.update_layout(xaxis_title="Dekade", yaxis_title="Gol per Pertandingan")
             st.plotly_chart(fig_decade2, use_container_width=True)
-            st.caption("⚽ Era mana yang paling produktif dalam mencetak gol?")
+            
+            most_productive = decade_stats.loc[decade_stats['Goals_Per_Match'].idxmax()]
+            with st.expander("⚽ **Tentang produktivitas gol**"):
+                st.markdown(f"""
+                <div class="insight-box">
+                Tim {pilih_negara} paling produktif mencetak gol di dekade {int(most_productive['decade'])}-an dengan rata-rata {most_productive['Goals_Per_Match']} gol per pertandingan. 
+                Di dekade terkini ({int(decade_stats.iloc[-1]['decade'])}-an), produktivitas berada di angka {decade_stats.iloc[-1]['Goals_Per_Match']} gol per laga. 
+                Secara keseluruhan, tim ini konsisten mencetak sekitar {decade_stats['Goals_Per_Match'].mean():.2f} gol tiap kali bertanding sepanjang sejarahnya.
+                </div>
+                """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🏠🏃 Performa Kandang vs Tandang</div>', unsafe_allow_html=True)
 
@@ -340,7 +370,15 @@ if not home_away_stats.empty:
         )
         fig_home.update_layout(yaxis_title="Persentase Kemenangan (%)", showlegend=False)
         st.plotly_chart(fig_home, use_container_width=True)
-        st.caption("🔍 Tim lebih kuat main di kandang atau tandang?")
+        
+        home_advantage = home_away_stats.iloc[0]['Win_Rate'] - home_away_stats.iloc[1]['Win_Rate']
+        with st.expander("🔍 **Perbandingan kandang vs tandang**"):
+            st.markdown(f"""
+            <div class="insight-box">
+            Seperti kebanyakan tim sepak bola, {pilih_negara} memang lebih kuat ketika bermain di kandang sendiri dengan persentase kemenangan {home_away_stats.iloc[0]['Win_Rate']:.1f}%, 
+            dibandingkan saat bermain di tandang yang hanya {home_away_stats.iloc[1]['Win_Rate']:.1f}%. Selisih {home_advantage:.1f}% ini menunjukkan betapa pentingnya dukungan suporter tuan rumah dalam menentukan hasil pertandingan.
+            </div>
+            """, unsafe_allow_html=True)
     
     with col_home2:
         fig_home2 = px.pie(
@@ -351,7 +389,15 @@ if not home_away_stats.empty:
             color_discrete_sequence=['#2ecc71', '#3498db']
         )
         st.plotly_chart(fig_home2, use_container_width=True)
-        st.caption("📊 Seberapa sering tim main di kandang vs tandang?")
+        
+        home_ratio = (home_away_stats.iloc[0]['Total_Pertandingan'] / home_away_stats['Total_Pertandingan'].sum()) * 100
+        with st.expander("📊 **Seberapa sering main di kandang?**"):
+            st.markdown(f"""
+            <div class="insight-box">
+            Dari total {home_away_stats['Total_Pertandingan'].sum()} pertandingan yang tercatat, {pilih_negara} lebih sering bermain di kandang sendiri ({home_away_stats.iloc[0]['Total_Pertandingan']} pertandingan) 
+            dibandingkan sebagai tim tamu ({home_away_stats.iloc[1]['Total_Pertandingan']} pertandingan). Rasio {home_ratio:.1f}% vs {100-home_ratio:.1f}% ini cukup wajar mengingat turnamen internasional biasanya mengutamakan prinsip home-and-away.
+            </div>
+            """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🎯 Analisis Tipe Gol</div>', unsafe_allow_html=True)
 
@@ -374,7 +420,18 @@ if not goal_types_df.empty and len(goal_types_df) > 0:
             percentage = (row["Jumlah"] / goal_types_df["Jumlah"].sum() * 100) if goal_types_df["Jumlah"].sum() > 0 else 0
             st.metric(label=row["Tipe_Gol"], value=f"{row['Jumlah']}", delta=f"{percentage:.1f}%")
     
-    st.caption("🎪 Lihat komposisi gol - berapa banyak dari penalty, own goal, atau gol normal?")
+    normal_goals = goal_types_df[goal_types_df['Tipe_Gol'] == 'Normal']['Jumlah'].iloc[0] if 'Normal' in goal_types_df['Tipe_Gol'].values else 0
+    penalty_goals = goal_types_df[goal_types_df['Tipe_Gol'] == 'Penalty']['Jumlah'].iloc[0] if 'Penalty' in goal_types_df['Tipe_Gol'].values else 0
+    own_goals = goal_types_df[goal_types_df['Tipe_Gol'] == 'Own Goal']['Jumlah'].iloc[0] if 'Own Goal' in goal_types_df['Tipe_Gol'].values else 0
+    
+    with st.expander("🎪 **Dari mana saja gol-golnya?**"):
+        st.markdown(f"""
+        <div class="insight-box">
+        Mayoritas gol {pilih_negara} berasal dari permainan normal ({normal_goals} gol atau {normal_goals/goal_types_df['Jumlah'].sum()*100:.1f}%), 
+        sementara gol penalti menyumbang {penalty_goals} gol ({penalty_goals/goal_types_df['Jumlah'].sum()*100:.1f}%). 
+        Gol bunuh diri lawan tercatat {own_goals} kali ({own_goals/goal_types_df['Jumlah'].sum()*100:.1f}%), menunjukkan bahwa tim ini juga mendapat keberuntungan dari kesalahan lawan.
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🕒 Timeline Interaktif Pertandingan</div>', unsafe_allow_html=True)
 
@@ -398,7 +455,17 @@ if not data_negara.empty:
     
     fig_timeline.update_layout(xaxis_title="Tanggal", yaxis_title="Turnamen", height=400)
     st.plotly_chart(fig_timeline, use_container_width=True)
-    st.caption("🕓 Timeline interaktif pertandingan terakhir. Hover untuk detail setiap pertandingan!")
+    
+    recent_wins = len(timeline_data[timeline_data['hasil'] == 'Menang'])
+    recent_form = (recent_wins / len(timeline_data)) * 100
+    with st.expander("🕓 **Form terbaru tim**"):
+        st.markdown(f"""
+        <div class="insight-box">
+        Dalam 50 pertandingan terakhir, {pilih_negara} berhasil meraih kemenangan {recent_wins} kali ({recent_form:.1f}%). 
+        Tim ini tampil di {timeline_data['tournament'].nunique()} turnamen berbeda, menunjukkan variasi kompetisi yang diikuti. 
+        {'Performanya cukup mengesankan' if recent_form > 60 else 'Hasilnya cukup stabil' if recent_form > 40 else 'Tim sedang mengalami masa sulit'} dalam periode ini.
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">📅 Tren Pertandingan per Tahun</div>', unsafe_allow_html=True)
 
@@ -416,7 +483,19 @@ if not data_negara.empty:
         )
         fig1.update_layout(hovermode="x unified")
         st.plotly_chart(fig1, use_container_width=True)
-        st.caption(f"📊 Terlihat kalau {pilih_negara} punya tren pertandingan yang {'naik turun tergantung turnamen besar' if len(tren_tahun)>0 else 'belum banyak datanya nih!'}.")
+        
+        peak_year = tren_tahun.loc[tren_tahun['jumlah_pertandingan'].idxmax()]
+        current_year = tren_tahun.iloc[-1]
+        growth = ((current_year['jumlah_pertandingan'] - tren_tahun.iloc[0]['jumlah_pertandingan']) / tren_tahun.iloc[0]['jumlah_pertandingan']) * 100
+        
+        with st.expander("📊 **Seberapa aktif tim ini?**"):
+            st.markdown(f"""
+            <div class="insight-box">
+            Aktivitas {pilih_negara} dalam sepak bola internasional mencapai puncaknya di tahun {int(peak_year['year'])} dengan {int(peak_year['jumlah_pertandingan'])} pertandingan. 
+            Di tahun terkini ({int(current_year['year'])}), tim ini bermain {int(current_year['jumlah_pertandingan'])} kali. 
+            Dibandingkan tahun {int(tren_tahun.iloc[0]['year'])}, {'ada peningkatan' if growth > 0 else 'terjadi penurunan'} sebesar {abs(growth):.1f}% dalam frekuensi pertandingan.
+            </div>
+            """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🏆 Rekor Menang, Seri, Kalah</div>', unsafe_allow_html=True)
 
@@ -434,7 +513,18 @@ if not data_negara.empty:
             title=f"Rekor Hasil Pertandingan {pilih_negara}",
         )
         st.plotly_chart(fig2, use_container_width=True)
-        st.caption(f"⚔️ {pilih_negara} punya total {len(data_negara)} pertandingan yang tercatat di dataset ini!")
+        
+        win_percentage = (rekap_hasil[rekap_hasil['Hasil'] == 'Menang']['Jumlah'].iloc[0] / rekap_hasil['Jumlah'].sum()) * 100
+        draw_percentage = (rekap_hasil[rekap_hasil['Hasil'] == 'Seri']['Jumlah'].iloc[0] / rekap_hasil['Jumlah'].sum()) * 100
+        loss_percentage = (rekap_hasil[rekap_hasil['Hasil'] == 'Kalah']['Jumlah'].iloc[0] / rekap_hasil['Jumlah'].sum()) * 100
+        
+        with st.expander("⚔️ **Statistik hasil pertandingan**"):
+            st.markdown(f"""
+            <div class="insight-box">
+            Sepanjang sejarahnya, {pilih_negara} telah memainkan {rekap_hasil['Jumlah'].sum()} pertandingan internasional dengan komposisi {win_percentage:.1f}% kemenangan, 
+            {draw_percentage:.1f}% hasil seri, dan {loss_percentage:.1f}% kekalahan. Angka-angka ini memberikan gambaran tentang konsistensi performa tim di kancah internasional.
+            </div>
+            """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">⚡ Pencetak Gol Terbanyak</div>', unsafe_allow_html=True)
 
@@ -456,7 +546,28 @@ if not pencetak_gol.empty:
             color_continuous_scale="blues",
         )
         st.plotly_chart(fig3, use_container_width=True)
-        st.caption("🔥 Ini dia deretan pemain yang paling sering nyetak gol buat negaranya!")
+        
+        top_scorer_name = top_scorer_goals = None
+        second_scorer_name = second_scorer_goals = None
+        
+        if len(top_scorers) > 0:
+            top_scorer_name = top_scorers.iloc[0]['Pemain']
+            top_scorer_goals = top_scorers.iloc[0]['Jumlah Gol']
+        
+        if len(top_scorers) > 1:
+            second_scorer_name = top_scorers.iloc[1]['Pemain']
+            second_scorer_goals = top_scorers.iloc[1]['Jumlah Gol']
+        
+        total_goals_top10 = top_scorers['Jumlah Gol'].sum()
+        
+        with st.expander("🔥 **Profil pencetak gol**"):
+            st.markdown(f"""
+            <div class="insight-box">
+            {top_scorer_name if top_scorer_name else 'Data tidak tersedia'} tercatat sebagai pencetak gol terbanyak {pilih_negara} dengan {top_scorer_goals if top_scorer_goals else 0} gol internasional. 
+            {f'{second_scorer_name} menempati posisi kedua dengan {second_scorer_goals} gol' if second_scorer_name else 'Data pencetak gol kedua tidak tersedia'}. 
+            Kesepuluh pencetak gol teratas ini berkontribusi {total_goals_top10} gol dari total {len(valid_scorers)} gol yang tercatat, dengan rata-rata {top_scorers['Jumlah Gol'].mean():.1f} gol per pemain.
+            </div>
+            """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🤼 Head-to-Head vs Lawan Teratas</div>', unsafe_allow_html=True)
 
@@ -472,7 +583,19 @@ if not head_to_head_df.empty:
     
     fig4.update_layout(title=f"Head-to-Head {pilih_negara} vs Lawan Terbanyak", barmode='stack', height=500)
     st.plotly_chart(fig4, use_container_width=True)
-    st.caption("💪 Lihat nih, rival-rival terberat dan yang paling sering ditaklukkan!")
+    
+    best_opponent = top_opponents.loc[top_opponents['Persentase Kemenangan'].idxmax()]
+    toughest_opponent = top_opponents.loc[top_opponents['Persentase Kemenangan'].idxmin()]
+    
+    with st.expander("💪 **Lawan-lawan terberat**"):
+        st.markdown(f"""
+        <div class="insight-box">
+        {pilih_negara} memiliki catatan terbaik melawan {best_opponent['Lawan']} dengan persentase kemenangan {best_opponent['Persentase Kemenangan']:.1f}%, 
+        sementara {toughest_opponent['Lawan']} menjadi lawan tersulit dengan hanya {toughest_opponent['Persentase Kemenangan']:.1f}% kemenangan. 
+        {top_opponents.iloc[0]['Lawan']} adalah lawan yang paling sering dihadapi dengan {top_opponents.iloc[0]['Total']} pertemuan. 
+        Rata-rata, tim ini menang {top_opponents['Persentase Kemenangan'].mean():.1f}% dari pertemuan melawan 10 lawan teratasnya.
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🏅 Performa di Berbagai Turnamen</div>', unsafe_allow_html=True)
 
@@ -493,7 +616,18 @@ if not tournament_stats.empty:
         )
         fig5.update_layout(xaxis_title="Total Pertandingan", yaxis_title="Persentase Kemenangan (%)")
         st.plotly_chart(fig5, use_container_width=True)
-        st.caption("🎯 Turnamen yang paling atas adalah yang paling sering dimainkan DAN punya persentase kemenangan tertinggi!")
+        
+        best_tournament = significant_tournaments.loc[significant_tournaments['Persentase Kemenangan'].idxmax()]
+        most_played = significant_tournaments.loc[significant_tournaments['Total'].idxmax()]
+        
+        with st.expander("🎯 **Turnamen andalan**"):
+            st.markdown(f"""
+            <div class="insight-box">
+            {pilih_negara} menunjukkan performa terbaik di {best_tournament['tournament']} dengan persentase kemenangan {best_tournament['Persentase Kemenangan']}%, 
+            sementara {most_played['tournament']} menjadi turnamen yang paling sering diikuti dengan {most_played['Total']} pertandingan. 
+            Tim ini telah tampil di {len(significant_tournaments)} turnamen berbeda dengan rata-rata kemenangan {significant_tournaments['Persentase Kemenangan'].mean():.1f}% per turnamen.
+            </div>
+            """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">📈 Timeline Gol dari Masa ke Masa</div>', unsafe_allow_html=True)
 
@@ -506,7 +640,19 @@ if not goals_by_year.empty and len(goals_by_year) > 1:
         color_discrete_sequence=["#ff6b6b"]
     )
     st.plotly_chart(fig6, use_container_width=True)
-    st.caption("🚀 Grafik ini menunjukkan era-era produktif dimana tim sering mencetak gol!")
+    
+    peak_goal_year = goals_by_year.loc[goals_by_year['Jumlah Gol'].idxmax()]
+    recent_goals = goals_by_year.iloc[-1]['Jumlah Gol'] if len(goals_by_year) > 0 else 0
+    goal_growth = ((recent_goals - goals_by_year.iloc[0]['Jumlah Gol']) / goals_by_year.iloc[0]['Jumlah Gol']) * 100 if goals_by_year.iloc[0]['Jumlah Gol'] > 0 else 0
+    
+    with st.expander("🚀 **Perkembangan daya serang**"):
+        st.markdown(f"""
+        <div class="insight-box">
+        Tahun {int(peak_goal_year['year'])} menjadi periode paling produktif bagi {pilih_negara} dengan {int(peak_goal_year['Jumlah Gol'])} gol yang berhasil dicetak. 
+        Di tahun terkini ({int(goals_by_year.iloc[-1]['year'])}), tim ini mencetak {int(recent_goals)} gol. 
+        {'Terjadi peningkatan' if goal_growth > 0 else 'Ada penurunan'} sebesar {abs(goal_growth):.1f}% dalam produktivitas gol dibandingkan tahun {int(goals_by_year.iloc[0]['year'])}.
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-header">🥅 Catatan Adu Penalti</div>', unsafe_allow_html=True)
 
@@ -517,7 +663,17 @@ shoot_display = shoot_negara[
 if not shoot_display.empty:
     shoot_display.rename(columns={"date": "Tanggal", "home_team": "Tim Tuan Rumah", "away_team": "Tim Tamu", "winner": "Pemenang"}, inplace=True)
     st.dataframe(shoot_display, hide_index=True, use_container_width=True)
-    st.caption(f"🎯 {pilih_negara} terlibat di {len(shoot_display)} pertandingan yang berakhir lewat adu penalti.")
+    
+    penalty_wins = len(shoot_display[shoot_display['Pemenang'] == pilih_negara])
+    penalty_win_rate = (penalty_wins / len(shoot_display)) * 100
+    
+    with st.expander("🎯 **Pengalaman adu penalti**"):
+        st.markdown(f"""
+        <div class="insight-box">
+        {pilih_negara} telah melalui {len(shoot_display)} adu penalti dalam sejarahnya, dengan {penalty_wins} kemenangan ({penalty_win_rate:.1f}% sukses). 
+        Catatan ini menunjukkan pengalaman tim dalam menghadapi situasi tekanan tinggi di adu penalti.
+        </div>
+        """, unsafe_allow_html=True)
 else:
     st.info("⚪ Belum ada catatan adu penalti untuk negara ini.")
 
@@ -530,10 +686,16 @@ former_filtered = former[
 if not former_filtered.empty:
     former_filtered.rename(columns={"current": "Nama Sekarang", "former": "Nama Lama", "start_date": "Mulai Digunakan", "end_date": "Selesai Digunakan"}, inplace=True)
     st.dataframe(former_filtered, hide_index=True, use_container_width=True)
-    st.caption(f"🧭 Menarik! {pilih_negara} pernah mengalami perubahan nama resmi.")
+    
+    with st.expander("🧭 **Fakta sejarah**"):
+        st.markdown(f"""
+        <div class="insight-box">
+        {pilih_negara} tercatat pernah mengalami perubahan nama sebanyak {len(former_filtered)} kali. 
+        Perubahan nama negara ini mencerminkan evolusi sejarah dan identitas nasional yang turut mempengaruhi perkembangan sepak bola nasionalnya.
+        </div>
+        """, unsafe_allow_html=True)
 else:
     st.info(f"✨ {pilih_negara} belum pernah tercatat mengalami perubahan nama resmi.")
-
 
 st.markdown("---")
 col_footer1, col_footer2, col_footer3 = st.columns([1,2,1])
